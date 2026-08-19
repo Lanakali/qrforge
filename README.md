@@ -133,17 +133,44 @@ The webhook layer maps price ID → plan, upgrades the key's plan on `active`/`t
 
 ## Deployment
 
-Any Node 18+ host works — one process, one SQLite file, no other services.
+The project ships in two halves by design:
 
-**Railway / Render / Fly.io (fastest):**
-- Build: `npm install` · Start: `npm start`
-- Set the env vars above, add a persistent disk for `DATABASE_PATH` (Railary/Render disks; on Render use a volume for `/data`).
+| Half | Hosts | Cost |
+|---|---|---|
+| **Website** (landing, docs, dashboard, client-side QR demo) | **GitHub Pages** — free, automatic via CI | $0 |
+| **API** (keys, quotas, QR generation, Stripe billing/webhooks) | any Node 18+ host (Render free tier, Railway, or a $5 VPS) | $0–5/mo |
 
-**$5 VPS (cheapest at scale):**
+The static site needs **no build step** — GitHub Pages serves `public/` directly.
+The demo QR generator runs 100% client-side (vendored `qrcode` library), so the
+site is fully functional even before the API is deployed ("demo mode").
+
+### 1. Website → GitHub Pages (automatic)
+
+A GitHub Actions workflow (`.github/workflows/pages.yml`) already:
+1. runs `npm ci && npm test` (the API smoke suite) on every push to `main`, and
+2. deploys `public/` to GitHub Pages on success.
+
+One-time setup in the repo: **Settings → Pages → Build and deployment → Source: "GitHub Actions"**.
+The site then lives at `https://<github-username>.github.io/qrforge/` and updates on every push.
+
+### 2. API → a small Node host
+
+**Render (one-click):** open the repo in Render → *New → Web Service* from the repo.
+The included [`.render.yaml`](.render.yaml) configures build/start/health check
+(`/api/v1/health`). Set the `sync: false` env vars: `APP_URL`, `STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO_ID`, `STRIPE_PRICE_BUSINESS_ID`.
+⚠️ Render's free tier has an **ephemeral filesystem** — attach a persistent disk
+for `DATABASE_PATH=/opt/render/data/qrforge.db`, or use the VPS option below for
+durable state.
+
+**Railway:** `railway up` in the repo root (uses [`railway.json`](railway.json));
+attach a volume for `DATABASE_PATH`.
+
+**$5 VPS (durable, cheapest at scale):**
 ```bash
 # install Node 20, then
 git clone https://github.com/Lanakali/qrforge /opt/qrforge && cd /opt/qrforge
-npm install --omit=dev
+npm ci --omit=dev
 # write .env (PORT=3000, APP_URL=https://qr.example.com, Stripe keys, DATABASE_PATH=/opt/qrforge/data/qrforge.db)
 pm2 start server.js --name qrforge && pm2 save
 ```
@@ -153,14 +180,44 @@ qr.example.com {
     reverse_proxy 127.0.0.1:3000
 }
 ```
-Back up `data/qrforge.db*` nightly (it's the only state).
+
+### 3. Wire them together (one line)
+
+Once the API has a URL, set it in [`public/config.js`](public/config.js):
+
+```js
+window.QRFORGE_CONFIG = { apiBase: "https://qr.example.com" };
+```
+
+and push. The dashboard, upgrade flow, and docs then point at the live API.
+Until then the site runs in demo mode with the client-side generator.
+
+The Stripe **webhook** endpoint lives on the **API** host:
+`https://<api-host>/stripe/webhook` (events + setup in §Billing setup).
+
+## Production checklist
+
+**Before taking payments:**
+- [ ] API deployed behind HTTPS (Render/Railway/VPS) with `APP_URL` set to the real URL
+- [ ] `STRIPE_SECRET_KEY` in **live mode** (sk-live_…) and price IDs for live prices
+- [ ] Stripe webhook pointing at `https://<api-host>/stripe/webhook` with `STRIPE_WEBHOOK_SECRET` set — **never** run `ALLOW_UNVERIFIED_WEBHOOKS=1` in production
+- [ ] `public/config.js` → `apiBase` set to the API URL and pushed
+- [ ] Test the full loop in Stripe test mode first: register key → checkout → webhook flips plan → dashboard shows new plan → cancel reverts to free
+
+**Ongoing ops (≈15 min/week):**
+- [ ] Uptime monitor on `https://<api-host>/api/v1/health` + the Pages URL (free tiers of any monitor work)
+- [ ] Nightly backup of `data/qrforge.db*` (the only state on the API host)
+- [ ] Stripe dashboard: watch failed payments (dunning is automatic; `past_due` is flagged in the DB)
+- [ ] GitHub Actions: confirm each push ran tests + deployed (red = site not updated)
+
+**Security posture (already in code):** webhook signature verification, per-IP rate limits, 100 KB body cap, strict input validation, `X-Content-Type-Options`, `X-Frame-Options: DENY`, CSP, HSTS when `APP_URL` is HTTPS, `no-store` on quota-bearing responses, static codes only (the API never stores encoded payloads).
 
 ## How this makes money (playbook)
 
 **Unit economics:** hosting ≈ $5–7/mo, Stripe ≈ 2.9% + 30¢ per charge, COGS of generating a QR ≈ 0. A single Pro customer covers the whole server. At 50 Pro subs ≈ $450 MRR on ~$10/mo costs.
 
 **Growth channels (in order of effort:**
-1. **SEO pages** — "free QR code API", "QRServer alternative", "QR code generator with API key": target the exact searches that already go to the free endpoints. The no-signup demo converts visitors who hit those endpoints' rate limits.
+1. **SEO pages** — "free QR code API", "QRServer alternative", "QR code generator with API key": target the exact searches that already go to the free endpoints. The instant in-browser demo converts visitors who hit those endpoints' rate limits (and the site itself is free to host on GitHub Pages).
 2. **API marketplaces** — list on RapidAPI (they run the billing; you keep ~80–90%) and the GetStream/npms API directories.
 3. **Launch posts** — Show HN, Product Hunt, dev.to ("I built the boring QR API I couldn't find").
 4. **Content** — short dev tutorials that use the API (event tickets, WiFi QR, vCards) with working code; each post is a long-tail SEO asset.
@@ -182,7 +239,7 @@ npm run dev    # node --watch
 npm test       # smoke tests: health, register, PNG/SVG, auth, validation, quota, demo, pages
 ```
 
-Architecture: `server.js` (Express app) → `lib/db.js` (SQLite schema), `lib/keys.js` (keys + quotas), `lib/billing.js` (Stripe checkout/webhooks), `lib/rateLimit.js` (fixed-window limiter) → `public/` (vanilla JS landing page + dashboard, no build step).
+Architecture: `server.js` (Express app) → `lib/db.js` (SQLite schema), `lib/keys.js` (keys + quotas), `lib/billing.js` (Stripe checkout/webhooks), `lib/rateLimit.js` (fixed-window limiter) → `public/` (static site: vanilla JS landing page + dashboard, no build step, deployed to GitHub Pages; `config.js` flips it between demo mode and a hosted API; `js/vendor/qrcode.min.js` is a pinned IIFE build of the `qrcode` package — regenerate with `npm run build:vendor` after bumping the dependency).
 
 ## License
 

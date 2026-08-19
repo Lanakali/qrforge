@@ -1,4 +1,6 @@
-/* QRForge landing page: code tabs, copy button, live demo. */
+/* QRForge landing page: code tabs, copy button, client-side live demo.
+ * The demo generates QR codes entirely in the browser (vendored qrcode lib) —
+ * no server required, nothing leaves the page. */
 (function () {
   'use strict';
 
@@ -27,11 +29,6 @@
       copyBtn.textContent = 'copied!';
       setTimeout(function () { copyBtn.textContent = 'copy'; }, 1500);
     }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(done, fallback);
-    } else {
-      fallback();
-    }
     function fallback() {
       var ta = document.createElement('textarea');
       ta.value = text;
@@ -41,15 +38,31 @@
       document.body.removeChild(ta);
       done();
     }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } else {
+      fallback();
+    }
   });
 
-  // ---- live demo ----
+  // ---- live demo (100% client-side) ----
   var dataInput = document.getElementById('demo-data');
   var sizeSelect = document.getElementById('demo-size');
   var formatSelect = document.getElementById('demo-format');
   var goBtn = document.getElementById('demo-go');
   var preview = document.getElementById('demo-preview');
   var note = document.getElementById('demo-note');
+  var currentUrl = null;
+
+  function ensureImg() {
+    var img = preview.querySelector('img');
+    if (!img) {
+      img = document.createElement('img');
+      preview.innerHTML = '';
+      preview.appendChild(img);
+    }
+    return img;
+  }
 
   function demoGenerate() {
     var t0 = performance.now();
@@ -59,38 +72,50 @@
       note.style.color = 'var(--warn)';
       return;
     }
+    var format = formatSelect.value;
     goBtn.disabled = true;
     goBtn.textContent = 'Generating…';
     note.textContent = '';
-    var url =
-      '/api/v1/demo-qr?data=' + encodeURIComponent(data) +
-      '&size=' + sizeSelect.value +
-      '&format=' + formatSelect.value;
-    fetch(url)
-      .then(function (res) {
-        if (!res.ok) return res.json().then(function (j) { throw new Error(j.error ? j.error.message : 'Request failed'); });
-        return res.blob();
-      })
-      .then(function (blob) {
-        var img = preview.querySelector('img');
-        if (!img) {
-          img = document.createElement('img');
-          preview.innerHTML = '';
-          preview.appendChild(img);
-        }
-        img.src = URL.createObjectURL(blob);
-        img.alt = 'Generated QR code';
-        note.textContent = 'Generated in ' + Math.round(performance.now() - t0) + ' ms by the live API. Free tier: 200 codes/mo with a key.';
-        note.style.color = '';
-      })
-      .catch(function (err) {
-        note.textContent = 'Demo error: ' + err.message;
-        note.style.color = 'var(--danger)';
-      })
-      .then(function () {
-        goBtn.disabled = false;
-        goBtn.textContent = 'Generate';
-      });
+
+    var opts = {
+      width: Number(sizeSelect.value),
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#000000', light: format === 'png' ? '#ffffff' : '#ffffff00' },
+    };
+
+    function finish(src, ms) {
+      var img = ensureImg();
+      if (currentUrl) URL.revokeObjectURL(currentUrl);
+      img.src = src;
+      img.alt = 'Generated QR code';
+      note.textContent = 'Generated in ' + ms + ' ms — right here in your browser. Your text never left this page.';
+      note.style.color = '';
+      goBtn.disabled = false;
+      goBtn.textContent = 'Generate';
+    }
+
+    function fail(err) {
+      note.textContent = 'Demo error: ' + (err && err.message ? err.message : 'generation failed');
+      note.style.color = 'var(--danger)';
+      goBtn.disabled = false;
+      goBtn.textContent = 'Generate';
+    }
+
+    if (format === 'svg') {
+      QRCode.toString(data, { type: 'svg', width: Number(sizeSelect.value), margin: 2, errorCorrectionLevel: 'M' })
+        .then(function (svg) {
+          currentUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+          finish(currentUrl, Math.round(performance.now() - t0));
+        })
+        .catch(fail);
+    } else {
+      QRCode.toDataURL(data, opts)
+        .then(function (url) {
+          finish(url, Math.round(performance.now() - t0));
+        })
+        .catch(fail);
+    }
   }
 
   goBtn.addEventListener('click', demoGenerate);

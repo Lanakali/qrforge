@@ -111,6 +111,25 @@ async function main() {
   res = await fetch(base + '/api/v1/nope');
   check('unknown API route -> JSON 404', res.status === 404);
 
+  // 15. static site assets (GitHub Pages payload)
+  const staticFiles = [
+    '/404.html',
+    '/robots.txt',
+    '/sitemap.xml',
+    '/config.js',
+    '/css/style.css',
+    '/js/site.js',
+    '/js/dashboard.js',
+    '/js/vendor/qrcode.min.js',
+  ];
+  for (const f of staticFiles) {
+    res = await fetch(base + f);
+    check('static ' + f + ' -> 200', res.status === 200);
+  }
+  res = await fetch(base + '/config.js');
+  const cfg = await res.text();
+  check('config.js exposes QRFORGE_CONFIG', cfg.includes('window.QRFORGE_CONFIG'));
+
   server.close();
   for (const f of [tmpDb, tmpDb + '-wal', tmpDb + '-shm']) {
     try { fs.unlinkSync(f); } catch {}

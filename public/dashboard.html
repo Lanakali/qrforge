@@ -33,6 +33,30 @@
     <h1>Dashboard</h1>
     <p class="sub">Paste your API key (<code class="mono small">qrf_live_…</code>) to see usage and manage your plan. The key is stored only in your browser's localStorage.</p>
 
+    <div class="card hidden" id="demo-mode-card">
+      <h2>QR generator — runs in your browser</h2>
+      <p class="small muted" style="margin-top:0">
+        The hosted API (keys, quotas, billing) isn't wired into this site yet — it's a one-line config change
+        (<code class="mono small">apiBase</code> in <code class="mono small">public/config.js</code>, see the README).
+        Meanwhile, generate QR codes here: everything stays in your browser.
+      </p>
+      <div class="test-row">
+        <input id="demo-data-2" type="text" value="https://qrforge.dev" maxlength="2000">
+        <select id="demo-size-2">
+          <option value="160">160</option>
+          <option value="256" selected>256</option>
+          <option value="512">512</option>
+        </select>
+        <select id="demo-format-2">
+          <option value="png">PNG</option>
+          <option value="svg">SVG</option>
+        </select>
+        <button class="btn btn-primary" id="demo-go-2">Generate</button>
+      </div>
+      <div class="msg" id="demo-msg-2"></div>
+      <div class="test-preview" id="demo-preview-2"></div>
+    </div>
+
     <div class="card" id="connect-card">
       <h2>Connect your API key</h2>
       <div class="key-row">
@@ -102,6 +126,8 @@
   </div>
 </footer>
 
+<script src="/js/vendor/qrcode.min.js"></script>
+<script src="/config.js"></script>
 <script src="/js/dashboard.js"></script>
 </body>
 </html>

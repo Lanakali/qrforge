@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: qrforge-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # Render free tier has an ephemeral filesystem: set a persistent volume
+      # (or use a $5 VPS) for durable key/quota storage.
+      - key: DATABASE_PATH
+        value: /opt/render/data/qrforge.db
+      - key: APP_URL
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_PRO_ID
+        sync: false
+      - key: STRIPE_PRICE_BUSINESS_ID
+        sync: false

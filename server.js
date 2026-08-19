@@ -12,10 +12,14 @@ const { PLANS, findKey, usageFor, recordUsage, currentMonth, createKey } = keys;
 
 const app = express();
 app.disable('x-powered-by');
+// Behind a reverse proxy (nginx/Caddy/Render/Railway) take the first
+// X-Forwarded-For hop as the client address for rate limiting.
+app.set('trust proxy', 1);
 
 const PORT = Number(process.env.PORT || 3000);
 const APP_URL = (process.env.APP_URL || '').replace(/\/+$/, '');
 const PUBLIC_URL = APP_URL || 'http://localhost:' + PORT;
+const IS_HTTPS = /^https:/.test(APP_URL);
 
 // ---------------------------------------------------------------------------
 // Security headers + body parsing
@@ -23,7 +27,9 @@ const PUBLIC_URL = APP_URL || 'http://localhost:' + PORT;
 
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
+  if (IS_HTTPS) res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains');
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'"
@@ -161,6 +167,8 @@ app.get(
     try {
       const out = await renderQr(req.query);
       res.setHeader('Content-Type', contentTypeFor(req));
+      // Deterministic output → safe for CDN caching (no secrets in the URL).
+      res.setHeader('Cache-Control', 'public, max-age=3600');
       res.setHeader('X-Ratelimit-Period', 'demo');
       res.send(out);
     } catch (err) {
@@ -228,6 +236,8 @@ async function handleQr(req, res) {
     const used = recordUsage(req.keyRow);
     const limit = PLANS[req.keyRow.plan].monthlyLimit;
     res.setHeader('Content-Type', contentTypeFor(req));
+    // Responses carry the key's live quota state → never cache through a CDN.
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Ratelimit-Limit', String(limit));
     res.setHeader('X-Ratelimit-Remaining', String(Math.max(0, limit - used)));
     res.setHeader('X-Ratelimit-Period', 'month');
@@ -347,10 +357,20 @@ app.post('/api/billing/portal', rateLimit({ limit: 10, windowMs: 3_600_000, keyF
 // ---------------------------------------------------------------------------
 
 if (require.main === module) {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`QRForge API + site listening on http://0.0.0.0:${PORT}`);
-    console.log(`  billing: ${billing.billingConfigured() ? 'Stripe enabled' : 'NOT configured (free tier only)'}`);
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`[qrforge] API + site listening on http://0.0.0.0:${PORT}`);
+    console.log(`[qrforge] billing: ${billing.billingConfigured() ? 'Stripe enabled' : 'NOT configured (free tier only)'}`);
+    if (IS_HTTPS) console.log('[qrforge] HSTS enabled (APP_URL is https)');
   });
+
+  // Graceful shutdown for container platforms (SIGTERM on deploy/restart).
+  for (const sig of ['SIGTERM', 'SIGINT']) {
+    process.on(sig, () => {
+      console.log(`[qrforge] ${sig} received, draining connections…`);
+      server.close(() => process.exit(0));
+      setTimeout(() => process.exit(1), 10_000).unref();
+    });
+  }
 }
 
 module.exports = { app };
