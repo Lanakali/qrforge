@@ -4,10 +4,14 @@
   "description": "QRForge — QR code generation API. Turn text into PNG/SVG QR codes with a simple REST API.",
   "main": "server.js",
   "scripts": {
+    "build": "node build.js",
+    "prestart": "node build.js",
+    "predev": "node build.js",
+    "pretest": "node build.js",
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node test/smoke.js",
-    "build:vendor": "esbuild node_modules/qrcode/lib/browser.js --bundle --format=iife --global-name=QRCode --minify --target=es2017 --outfile=public/js/vendor/qrcode.min.js"
+    "build:vendor": "esbuild node_modules/qrcode/lib/browser.js --bundle --format=iife --global-name=QRCode --minify --target=es2017 --outfile=site/js/vendor/qrcode.min.js"
   },
   "engines": {
     "node": ">=18"

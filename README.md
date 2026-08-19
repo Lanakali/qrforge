@@ -140,15 +140,18 @@ The project ships in two halves by design:
 | **Website** (landing, docs, dashboard, client-side QR demo) | **GitHub Pages** — free, automatic via CI | $0 |
 | **API** (keys, quotas, QR generation, Stripe billing/webhooks) | any Node 18+ host (Render free tier, Railway, or a $5 VPS) | $0–5/mo |
 
-The static site needs **no build step** — GitHub Pages serves `public/` directly.
-The demo QR generator runs 100% client-side (vendored `qrcode` library), so the
-site is fully functional even before the API is deployed ("demo mode").
+The static site is **built as fully self-contained HTML** — `npm run build`
+inlines all CSS, JS, the QR engine, and the site config into each page
+(`public/`, gitignored). One file per page, **zero external requests**: it
+works on GitHub Pages, opened straight from disk, or in any single-file
+viewer. The demo QR generator runs 100% client-side, so the site is fully
+functional even before the API is deployed ("demo mode").
 
 ### 1. Website → GitHub Pages (automatic)
 
 A GitHub Actions workflow (`.github/workflows/pages.yml`) already:
-1. runs `npm ci && npm test` (the API smoke suite) on every push to `main`, and
-2. deploys `public/` to GitHub Pages on success.
+1. runs `npm ci && npm run build && npm test` (build + the API smoke suite) on every push to `main`, and
+2. deploys the built `public/` to GitHub Pages on success.
 
 One-time setup in the repo: **Settings → Pages → Build and deployment → Source: "GitHub Actions"**.
 The site then lives at `https://<github-username>.github.io/qrforge/` and updates on every push.
@@ -183,14 +186,16 @@ qr.example.com {
 
 ### 3. Wire them together (one line)
 
-Once the API has a URL, set it in [`public/config.js`](public/config.js):
+Once the API has a URL, set it in [`site.config.json`](site.config.json):
 
-```js
-window.QRFORGE_CONFIG = { apiBase: "https://qr.example.com" };
+```json
+{ "apiBase": "https://qr.example.com" }
 ```
 
-and push. The dashboard, upgrade flow, and docs then point at the live API.
-Until then the site runs in demo mode with the client-side generator.
+and push — CI rebuilds the site with the config embedded, and the dashboard,
+upgrade flow, and docs point at the live API. Until then the site runs in
+demo mode with the client-side generator. (Locally: `npm run build` after
+editing the config.)
 
 The Stripe **webhook** endpoint lives on the **API** host:
 `https://<api-host>/stripe/webhook` (events + setup in §Billing setup).
@@ -239,7 +244,7 @@ npm run dev    # node --watch
 npm test       # smoke tests: health, register, PNG/SVG, auth, validation, quota, demo, pages
 ```
 
-Architecture: `server.js` (Express app) → `lib/db.js` (SQLite schema), `lib/keys.js` (keys + quotas), `lib/billing.js` (Stripe checkout/webhooks), `lib/rateLimit.js` (fixed-window limiter) → `public/` (static site: vanilla JS landing page + dashboard, no build step, deployed to GitHub Pages; `config.js` flips it between demo mode and a hosted API; `js/vendor/qrcode.min.js` is a pinned IIFE build of the `qrcode` package — regenerate with `npm run build:vendor` after bumping the dependency).
+Architecture: `server.js` (Express app) → `lib/db.js` (SQLite schema), `lib/keys.js` (keys + quotas), `lib/billing.js` (Stripe checkout/webhooks), `lib/rateLimit.js` (fixed-window limiter). Static site: `site/` holds the templates (vanilla JS landing page + dashboard), `build.js` inlines CSS/JS/config into self-contained pages in `public/` (gitignored; `site.config.json` flips the site between demo mode and a hosted API; `site/js/vendor/qrcode.min.js` is a pinned IIFE build of the `qrcode` package — regenerate with `npm run build:vendor` after bumping the dependency). `npm start`/`npm test` build automatically via pre-hooks.
 
 ## License
 

@@ -111,24 +111,22 @@ async function main() {
   res = await fetch(base + '/api/v1/nope');
   check('unknown API route -> JSON 404', res.status === 404);
 
-  // 15. static site assets (GitHub Pages payload)
-  const staticFiles = [
-    '/404.html',
-    '/robots.txt',
-    '/sitemap.xml',
-    '/config.js',
-    '/css/style.css',
-    '/js/site.js',
-    '/js/dashboard.js',
-    '/js/vendor/qrcode.min.js',
-  ];
-  for (const f of staticFiles) {
+  // 15. static site pages (self-contained, GitHub Pages payload)
+  for (const f of ['/', '/dashboard.html', '/404.html', '/robots.txt', '/sitemap.xml']) {
     res = await fetch(base + f);
     check('static ' + f + ' -> 200', res.status === 200);
   }
-  res = await fetch(base + '/config.js');
-  const cfg = await res.text();
-  check('config.js exposes QRFORGE_CONFIG', cfg.includes('window.QRFORGE_CONFIG'));
+  res = await fetch(base + '/');
+  const home = await res.text();
+  check('index is self-contained (inlined CSS)', home.includes('<style>') && !home.includes('href="css/style.css"'));
+  check('index is self-contained (inlined JS)', home.includes('QRCode') && !home.includes('src="js/site.js"'));
+  check('index embeds QRFORGE_CONFIG', home.includes('window.QRFORGE_CONFIG'));
+  res = await fetch(base + '/dashboard.html');
+  const dash = await res.text();
+  check('dashboard is self-contained', dash.includes('<style>') && !dash.includes('src="js/dashboard.js"'));
+  // no absolute-root asset refs anywhere (would break subpath deployments)
+  check('no absolute-root asset refs in index', !/href="\/(?!\/)/.test(home.replace(/href="\/"/g, '')));
+  check('no absolute-root asset refs in dashboard', !/src="\/|href="\/(?!\/)/.test(dash));
 
   server.close();
   for (const f of [tmpDb, tmpDb + '-wal', tmpDb + '-shm']) {
