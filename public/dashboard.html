@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard — QRForge</title>
+  <meta name="description" content="QRForge dashboard: usage, plan, and billing for your API key.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2322d3a5'/%3E%3Cpath d='M8 8h7v7H8zM17 8h7v7h-7zM8 17h7v7H8z' fill='%2304110c'/%3E%3Cpath d='M17 17h3v3h-3zM22 17h2v2h-2zM19 22h5v3h-5z' fill='%2304110c'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap nav-inner">
+    <a class="logo" href="/">
+      <span class="logo-mark">
+        <svg width="15" height="15" viewBox="0 0 32 32"><path d="M5 5h10v10H5zM17 5h10v10H17zM5 17h10v10H5zM17 17h5v5h-5zM24 17h3v3h-3zM20 24h7v3h-7z" fill="#04110c"/></svg>
+      </span>
+      QRForge
+    </a>
+    <div class="nav-links">
+      <a href="/#demo">Demo</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/#docs">Docs</a>
+      <a href="https://github.com/Lanakali/qrforge">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<main class="dash">
+  <div class="wrap">
+    <h1>Dashboard</h1>
+    <p class="sub">Paste your API key (<code class="mono small">qrf_live_…</code>) to see usage and manage your plan. The key is stored only in your browser's localStorage.</p>
+
+    <div class="card" id="connect-card">
+      <h2>Connect your API key</h2>
+      <div class="key-row">
+        <input id="api-key" type="password" placeholder="qrf_live_…" autocomplete="off">
+        <button class="btn btn-primary" id="connect-btn">Connect</button>
+        <button class="btn btn-ghost" id="disconnect-btn" type="button">Forget key</button>
+      </div>
+      <div class="msg" id="connect-msg"></div>
+    </div>
+
+    <div id="usage-section" class="hidden">
+      <div class="card">
+        <h2>Usage <span class="badge-plan" id="plan-badge">…</span></h2>
+        <div class="stat-grid">
+          <div class="stat"><div class="k">Used this month</div><div class="v" id="stat-used">—</div></div>
+          <div class="stat"><div class="k">Remaining</div><div class="v" id="stat-remaining">—</div></div>
+          <div class="stat"><div class="k">Monthly limit</div><div class="v" id="stat-limit">—</div></div>
+          <div class="stat"><div class="k">Resets on</div><div class="v" id="stat-reset">—</div></div>
+        </div>
+        <div class="progress"><div id="progress-bar" style="width: 0%"></div></div>
+        <p class="small muted" id="stripe-status" style="margin-top:12px"></p>
+      </div>
+
+      <div class="card">
+        <h2>Upgrade your plan</h2>
+        <div class="upgrade-grid">
+          <div class="plan popular">
+            <h3>Pro</h3>
+            <div class="price">$9<small>/mo</small></div>
+            <div class="per">10,000 codes / month</div>
+            <button class="btn btn-primary btn-block" data-plan="pro" id="upgrade-pro">Switch to Pro</button>
+          </div>
+          <div class="plan">
+            <h3>Business</h3>
+            <div class="price">$29<small>/mo</small></div>
+            <div class="per">100,000 codes / month</div>
+            <button class="btn btn-ghost btn-block" data-plan="business" id="upgrade-business">Switch to Business</button>
+          </div>
+        </div>
+        <div class="msg" id="billing-msg"></div>
+        <p class="small muted" style="margin-top:14px">
+          <a href="#" id="manage-billing">Manage billing / cancel</a> · Paid via Stripe — cancel anytime, quotas revert to Free on cancellation.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Test your key</h2>
+        <div class="test-row">
+          <input id="test-data" type="text" value="https://qrforge.dev" maxlength="2000">
+          <select id="test-format">
+            <option value="png">PNG</option>
+            <option value="svg">SVG</option>
+          </select>
+          <button class="btn btn-ghost" id="test-go">Generate</button>
+        </div>
+        <div class="msg" id="test-msg"></div>
+        <div class="test-preview" id="test-preview"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap footer-inner">
+    <span>© 2026 QRForge · Built by Lanakali</span>
+    <span><a href="https://github.com/Lanakali/qrforge">Open source (MIT)</a> · <a href="/#docs">Docs</a></span>
+  </div>
+</footer>
+
+<script src="/js/dashboard.js"></script>
+</body>
+</html>

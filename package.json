@@ -1,0 +1,28 @@
+{
+  "name": "qrforge",
+  "version": "1.0.0",
+  "description": "QRForge — QR code generation API. Turn text into PNG/SVG QR codes with a simple REST API.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test/smoke.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "qr",
+    "qr-code",
+    "api",
+    "saas",
+    "rest"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "express": "^4.21.2",
+    "qrcode": "^1.5.4",
+    "stripe": "^18.2.1"
+  }
+}
